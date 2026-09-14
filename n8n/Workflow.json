@@ -377,7 +377,7 @@
     },
     {
       "parameters": {
-        "url": "https://jobicy.com/api/v2/remote-jobs?count=50&industry=engineering",
+        "url": "https://jobicy.com/api/v2/remote-jobs?count=50&tag=junior",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -391,7 +391,7 @@
     },
     {
       "parameters": {
-        "url": "https://remotive.com/api/remote-jobs?category=software-dev",
+        "url": "https://remotive.com/api/remote-jobs?search=junior",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -405,7 +405,7 @@
     },
     {
       "parameters": {
-        "url": "https://www.themuse.com/api/public/jobs?category=Data%20and%20Analytics&category=Software%20Engineering&page=1",
+        "url": "https://www.themuse.com/api/public/jobs?level=Entry%20Level&category=Data%20and%20Analytics&page=1",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -494,7 +494,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const jobs = $input.first().json.data || [];\nreturn jobs.map(item => {\n  const attr = item.attributes;\n  return {\n    json: {\n      id: item.id,\n      fuente: 'GetOnBoard',\n      titulo: attr.title,\n      empresa: attr.company?.data?.attributes?.name || 'Confidencial',\n      url: attr.links?.public_url || '',\n      ubicacion: `${attr.country || ''} - ${attr.city || ''} (${attr.modality || ''})`.trim(),\n      descripcionLimpia: (attr.description || '').replace(/<[^>]*>?/gm, ' ').replace(/\\s+/g, ' ').trim().slice(0, 3000)\n    }\n  };\n});"
+        "jsCode": "const items = $input.all();\nconst resultados = [];\n\n// Manejar si viene envuelto en \"data\" (estándar de JSON:API)\nlet jobs = [];\nif (items[0].json && Array.isArray(items[0].json.data)) {\n  jobs = items[0].json.data;\n} else {\n  jobs = items.map(i => i.json);\n}\n\nfor (const job of jobs) {\n  const attr = job.attributes || {};\n  \n  // 1. URL GARANTIZADA\n  const url = `https://www.getonbrd.com/jobs/${job.id}`;\n\n  // 2. DESCRIPCIÓN EXACTA\n  const partesDesc = [\n    attr.description_headline,\n    attr.description,\n    attr.projects,\n    attr.functions_headline,\n    attr.functions,\n    attr.benefits_headline,\n    attr.benefits,\n    attr.desirable_headline,\n    attr.desirable\n  ].filter(Boolean).join(' '); \n\n  const descripcionLimpia = partesDesc.replace(/<[^>]*>?/gm, ' ').replace(/\\s+/g, ' ').trim();\n\n  // 3. UBICACIÓN DINÁMICA (Con el salvavidas de la URL que sugeriste)\n  let ubicacion = '';\n  \n  let pais = '';\n  if (attr.country) {\n    pais = typeof attr.country === 'object' ? attr.country.name : attr.country;\n  }\n\n  // A. Primero intentamos lo oficial (si es remoto o trae país)\n  if (attr.remote || attr.remote_zone) {\n    ubicacion = attr.remote_zone ? `Remote (${attr.remote_zone})` : 'Remote';\n  } else if (pais) {\n    ubicacion = pais;\n  } else {\n    // B. PLAN DE RESCATE: Buscar la ciudad en la URL (job.id)\n    const idStr = (job.id || '').toLowerCase();\n    \n    if (idStr.includes('bogota')) ubicacion = 'Bogotá, Colombia';\n    else if (idStr.includes('medellin')) ubicacion = 'Medellín, Colombia';\n    else if (idStr.includes('santiago')) ubicacion = 'Santiago, Chile';\n    else if (idStr.includes('lima')) ubicacion = 'Lima, Perú';\n    else if (idStr.includes('buenos-aires')) ubicacion = 'Buenos Aires, Argentina';\n    else if (idStr.includes('mexico') || idStr.includes('cdmx')) ubicacion = 'México';\n    else if (idStr.includes('montevideo')) ubicacion = 'Montevideo, Uruguay';\n    else if (idStr.includes('quito')) ubicacion = 'Quito, Ecuador';\n    else if (idStr.includes('remote') || idStr.includes('remoto')) ubicacion = 'Remote';\n    else ubicacion = 'No especificada';\n  }\n\n  // 4. EMPRESA\n  let empresa = 'Confidencial';\n  if (job.relationships?.company?.data?.id) {\n     empresa = job.relationships.company.data.id.replace(/-/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase());\n  } else if (attr.company?.data?.attributes?.name) {\n     empresa = attr.company.data.attributes.name;\n  }\n\n  resultados.push({\n    json: {\n      id: job.id,\n      fuente: 'GetOnBoard',\n      titulo: attr.title || 'Sin título',\n      empresa: empresa,\n      url: url,\n      ubicacion: ubicacion,\n      descripcionLimpia: descripcionLimpia\n    }\n  });\n}\n\nreturn resultados;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -776,7 +776,7 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "fc3d734c-1ad1-459c-a652-b329ec5eee42",
+  "versionId": "0e18cdec-e874-47a8-8606-3b978793ccf2",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "47a17af7f0d59c648449f75d91448e71bec4469c4a177b33e461ca4efa732582"
