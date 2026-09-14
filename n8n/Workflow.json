@@ -1,0 +1,787 @@
+{
+  "name": "job-offer-scraper",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                3,
+                5,
+                6
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e08684da-53be-4d29-b239-b4eede64d139",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs",
+          "mode": "list",
+          "cachedResultName": "job-offer-scraper",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Mi_Perfil",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "2d916efb-52a7-44dc-af6c-9d1718c11bf5",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2LswmUiVzFLVgT6K",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "id": "e51c9fde-d181-4136-8442-67572d018f45",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs",
+          "mode": "list",
+          "cachedResultName": "job-offer-scraper",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 915360768,
+          "mode": "list",
+          "cachedResultName": "Filtros_Busqueda",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit#gid=915360768"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        672,
+        0
+      ],
+      "id": "d4cbf667-dd0e-44c4-943f-7a409288dfc4",
+      "name": "Get row(s) in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2LswmUiVzFLVgT6K",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        896,
+        0
+      ],
+      "id": "e00178e5-704e-479d-8d75-93b42ecd8244",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (!items || items.length === 0) {\n  throw new Error(\"No hay datos de entrada en Filtros.\");\n}\n\n// 1. DESEMPAQUETAR HOJA DE FILTROS\nlet filasFiltros = [];\nif (items[0].json && Array.isArray(items[0].json.data)) {\n  filasFiltros = items[0].json.data;\n} else {\n  filasFiltros = items.map(item => item.json);\n}\n\nfunction extraerFiltro(nombreColumna) {\n  const objetivo = nombreColumna.toLowerCase().replace(/[\\s_]/g, '');\n  const resultado = [];\n  for (const fila of filasFiltros) {\n    for (const [clave, valor] of Object.entries(fila)) {\n      const claveLimpia = clave.toLowerCase().replace(/[\\s_]/g, '');\n      if (claveLimpia === objetivo && valor !== null && valor !== undefined && String(valor).trim() !== '') {\n        String(valor).split(',').forEach(v => {\n          const limpio = v.trim().toLowerCase();\n          if (limpio) resultado.push(limpio);\n        });\n      }\n    }\n  }\n  return [...new Set(resultado)];\n}\n\nconst rolesDeseados = extraerFiltro('rolesdeseados');\nconst rolesRechazados = extraerFiltro('rolesrechazados');\nconst keywordsRechazadas = extraerFiltro('keywordsrechazadas');\nconst ubicacionesValidas = extraerFiltro('ubicacionesvalidas');\nconst ubicacionesRechazadas = extraerFiltro('ubicacionesrechazadas');\n\n// 2. DESEMPAQUETAR HOJA \"MI_PERFIL\" DINÁMICAMENTE\nlet perfilTexto = \"\";\n\ntry {\n  // Leemos los datos del nodo de Sheets llamado 'Mi_Perfil'\n  const itemsPerfil = $('Aggregate').all(); \n  \n  let filasPerfil = [];\n  if (itemsPerfil.length > 0) {\n    if (itemsPerfil[0].json && Array.isArray(itemsPerfil[0].json.data)) {\n      filasPerfil = itemsPerfil[0].json.data;\n    } else {\n      filasPerfil = itemsPerfil.map(i => i.json);\n    }\n  }\n\n  const habilidadesEncontradas = [];\n\n  for (const fila of filasPerfil) {\n    let nombreHabilidad = '';\n    let nivelHabilidad = 'Intermedio'; // Valor por defecto si no tienes columna Nivel\n\n    for (const [clave, valor] of Object.entries(fila)) {\n      const claveLimpia = clave.toLowerCase().replace(/[\\s_]/g, '');\n      if (claveLimpia === 'habilidad' || claveLimpia === 'skill' || claveLimpia === 'habilidades') {\n        nombreHabilidad = valor;\n      }\n      if (claveLimpia === 'nivel' || claveLimpia === 'level') {\n        nivelHabilidad = valor;\n      }\n    }\n\n    if (nombreHabilidad && String(nombreHabilidad).trim() !== '') {\n      habilidadesEncontradas.push(`${nombreHabilidad} (${nivelHabilidad})`.trim());\n    }\n  }\n\n  if (habilidadesEncontradas.length > 0) {\n    perfilTexto = \"Ingeniero de Sistemas. Habilidades técnicas: \" + habilidadesEncontradas.join(', ');\n  } else if (filasPerfil.length > 0) {\n    // Si leyó la hoja pero no encontró la columna 'Habilidad'\n    const columnasPerfil = Object.keys(filasPerfil[0]);\n    perfilTexto = `ERROR: n8n leyó la hoja Mi_Perfil pero no encontró la columna. Columnas detectadas: [${columnasPerfil.join(', ')}]`;\n  } else {\n    perfilTexto = \"ERROR: El nodo Mi_Perfil no entregó datos.\";\n  }\n\n} catch (e) {\n  perfilTexto = `ERROR LEYENDO NODO Mi_Perfil: Verifica que el nodo de Sheets se llame exactamente 'Mi_Perfil'. Detalle: ${e.message}`;\n}\n\nreturn [{\n  json: {\n    rolesDeseados,\n    rolesRechazados,\n    keywordsRechazadas,\n    ubicacionesValidas,\n    ubicacionesRechazadas,\n    perfilString: perfilTexto\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "e59c3c5b-2f16-4490-9540-c55fa64b87f6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Lectura de filtros desde Sheets\nconst filtros = $('Code in JavaScript').first().json || {};\n\nconst limpiar = arr => (arr || [])\n  .map(x => String(x).toLowerCase().trim())\n  .filter(x => x.length > 0);\n\nconst rolesDeseados = limpiar(filtros.rolesDeseados);\nconst rolesRechazados = limpiar(filtros.rolesRechazados);\nconst keywordsRechazadas = limpiar(filtros.keywordsRechazadas);\nconst ubicacionesValidas = limpiar(filtros.ubicacionesValidas);\nconst ubicacionesRechazadas = limpiar(filtros.ubicacionesRechazadas);\n\n// Si la lista no llegó de Sheets, paramos para evitar falsos positivos\nif (rolesDeseados.length === 0) {\n  return [{\n    json: {\n      ALERTA: \"rolesDeseados llegó vacío. Haz clic en 'Test step' en el nodo 'Code in JavaScript' primero.\",\n      filtrosRecibidos: filtros\n    }\n  }];\n}\n\nconst items = $input.all();\nconst aprobados = [];\n\nfunction escapeRegex(str) {\n  return str.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n}\n\nfunction coincide(patron, texto) {\n  if (!patron || !texto) return false;\n  if (patron.includes(' ')) {\n    return texto.includes(patron);\n  }\n  return new RegExp(`\\\\b${escapeRegex(patron)}\\\\b`, 'i').test(texto);\n}\n\nfor (const item of items) {\n  const job = item.json;\n\n  const titulo = (job.titulo || job.title || job.jobTitle || job.name || '').toLowerCase();\n  const descripcion = (job.descripcionLimpia || job.description || job.jobDescription || job.contents || '').toLowerCase();\n  const ubicacion = (job.ubicacion || job.candidate_required_location || job.jobGeo || job.locations?.[0]?.name || '').toLowerCase();\n  const textoCompleto = `${titulo} ${descripcion}`;\n\n  if (!titulo && !descripcion) continue;\n\n  // 1. Descarte por ubicación rechazada\n  if (ubicacionesRechazadas.length > 0) {\n    const esVetada = ubicacionesRechazadas.some(ub => coincide(ub, ubicacion));\n    if (esVetada) continue;\n  }\n\n  // 2. Filtro por ubicación válida\n  if (ubicacionesValidas.length > 0) {\n    const esValida = ubicacionesValidas.some(ub => coincide(ub, ubicacion));\n    if (!esValida) continue;\n  }\n\n  // 3. Descarte por rol no deseado en el título (senior, lead, etc.)\n  if (rolesRechazados.length > 0) {\n    const tieneRolRechazado = rolesRechazados.some(rol => coincide(rol, titulo));\n    if (tieneRolRechazado) continue;\n  }\n\n  // 4. Descarte por keyword rechazada en el texto (3+ years, etc.)\n  if (keywordsRechazadas.length > 0) {\n    const tieneKeywordRechazada = keywordsRechazadas.some(kw => coincide(kw, textoCompleto));\n    if (tieneKeywordRechazada) continue;\n  }\n\n  // 5. EVALUACIÓN ESTRICTA: El rol deseado DEBE estar en el TÍTULO, jamás en la descripción\n  const rolCoincidente = rolesDeseados.find(rol => coincide(rol, titulo));\n  if (!rolCoincidente) {\n    continue;\n  }\n\n  // Aprobado\n  aprobados.push({\n    json: {\n      id: job.id || Math.random().toString(36).substring(7),\n      fuente: job.fuente || 'API',\n      titulo: job.titulo || job.title || job.jobTitle || job.name,\n      empresa: job.empresa || job.company_name || job.companyName || job.company?.name || 'Confidencial',\n      url: job.url || job.refs?.landing_page || '',\n      ubicacion: job.ubicacion || job.candidate_required_location || job.jobGeo || 'No especificada',\n      motivo_aprobacion: `Coincide con rol deseado: '${rolCoincidente}' en el título`,\n      descripcionLimpia: (descripcion || '').replace(/<[^>]*>?/gm, ' ').replace(/\\s+/g, ' ').trim().slice(0, 2000)\n    }\n  });\n}\n\n\nreturn aprobados;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1952,
+        0
+      ],
+      "id": "cb2e752f-a91f-4378-a53f-1c7b23ce2466",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "maxItems": 40
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        2176,
+        0
+      ],
+      "id": "d7c82a91-387c-4fb6-9338-73a53f375c6a",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"temperature\": 0.1,\n  \"max_tokens\": 700,\n  \"response_format\": {\n    \"type\": \"json_object\"\n  },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres un reclutador técnico. Responde estrictamente con un JSON válido y conciso.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": {{ JSON.stringify(`Analiza la siguiente oferta para un perfil recién graduado / junior:\n\nTítulo: ${$json.titulo || $json.title || ''}\nEmpresa: ${$json.empresa || $json.company_name || 'Confidencial'}\nDescripción:\n${($json.descripcionLimpia || $json.description || '').slice(0, 1200)}\n\nPerfil técnico:\n${$('Code in JavaScript').first().json.perfilString}\n\nInstrucciones:\n1. Evalúa si la vacante es adecuada para entry-level / junior con este perfil.\n2. match_score de 0 a 100.\n3. Si match_score >= 65, aplica = true, de lo contrario false.\n4. resumen_fit: máximo 2 oraciones breves.\n5. Máximo 4 habilidades en cada lista.\n\nJSON requerido:\n{\n  \"aplica\": boolean,\n  \"match_score\": number,\n  \"resumen_fit\": string,\n  \"habilidades_coincidentes\": [\"habilidad1\"],\n  \"habilidades_faltantes\": [\"habilidad1\"]\n}`) }}\n    }\n  ]\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 10000
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2400,
+        0
+      ],
+      "id": "2a62bb98-d3db-4cc9-a7d5-ebcb223960cc",
+      "name": "Evaluar_Oferta_LLM",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7HD08iQFiLrUM35W",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst resultados = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const respuestaGroq = items[i].json;\n  // Recuperamos la info original de la vacante desde el nodo Limit\n  const trabajoOriginal = $('Limit').all()[i].json;\n  \n  let evaluacion = {};\n  try {\n    evaluacion = JSON.parse(respuestaGroq.choices[0].message.content);\n  } catch (e) {\n    evaluacion = {\n      match_score: 0,\n      aplica: false,\n      resumen_fit: \"Error al parsear respuesta\",\n      habilidades_faltantes: [],\n      habilidades_coincidentes: []\n    };\n  }\n\n  resultados.push({\n    json: {\n      id: trabajoOriginal.id,\n      titulo: trabajoOriginal.titulo,\n      empresa: trabajoOriginal.empresa,\n      url: trabajoOriginal.url,\n      ubicacion: trabajoOriginal.ubicacion,\n      match_score: evaluacion.match_score,\n      aplica: evaluacion.aplica,\n      resumen_fit: evaluacion.resumen_fit,\n      habilidades_faltantes: evaluacion.habilidades_faltantes || [],\n      habilidades_coincidentes: evaluacion.habilidades_coincidentes || []\n    }\n  });\n}\n\nreturn resultados;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2592,
+        0
+      ],
+      "id": "b0505a93-de30-4d72-93a9-ad84033ca9e3",
+      "name": "Parsear_Evaluacion"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst skillsAplanadas = [];\nconst fechaHoy = new Date().toISOString().split('T')[0];\n\nfor (const item of items) {\n  const job = item.json;\n  if (job.habilidades_faltantes && Array.isArray(job.habilidades_faltantes)) {\n    for (const skill of job.habilidades_faltantes) {\n      skillsAplanadas.push({\n        json: {\n          Habilidad_Faltante: skill.trim(),\n          Trabajo: `${job.titulo} (${job.empresa})`,\n          URL: job.url,\n          Fecha: fechaHoy\n        }\n      });\n    }\n  }\n}\n\nreturn skillsAplanadas;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2768,
+        -80
+      ],
+      "id": "f9abc674-8358-4d22-a86f-3ab8029dc3b7",
+      "name": "Aplanar_Gap_Skills"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs",
+          "mode": "list",
+          "cachedResultName": "job-offer-scraper",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 854508604,
+          "mode": "list",
+          "cachedResultName": "Gap_Skills",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit#gid=854508604"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Habilidad_Faltante": "={{ $json.Habilidad_Faltante }}",
+            "Conteo": "1",
+            "Ultima_Vez_Vista": "={{ $json.Fecha }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Habilidad_Faltante",
+              "displayName": "Habilidad_Faltante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Conteo",
+              "displayName": "Conteo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ultima_Vez_Vista",
+              "displayName": "Ultima_Vez_Vista",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2992,
+        -80
+      ],
+      "id": "abd33ac6-c8a4-4ca6-9aea-57641df4735d",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2LswmUiVzFLVgT6K",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nif (items.length === 0) {\n  return [{\n    json: {\n      mensaje: \"🔍 *Radar Laboral*: Hoy no se encontraron vacantes con match superior al 65%.\"\n    }\n  }];\n}\n\nlet cuerpo = `🚀 *Radar de Oportunidades Laborales (${items.length} encontradas)*\\n\\n`;\n\nitems.forEach((item, index) => {\n  const job = item.json;\n  cuerpo += `*${index + 1}. ${job.titulo}* en *${job.empresa}*\\n`;\n  cuerpo += `🎯 *Match:* ${job.match_score}%\\n`;\n  cuerpo += `📍 *Ubicación:* ${job.ubicacion || 'Remoto'}\\n`;\n  cuerpo += `💡 *Fit:* ${job.resumen_fit}\\n`;\n  if (job.habilidades_coincidentes && job.habilidades_coincidentes.length > 0) {\n    cuerpo += `✅ *Match técnico:* ${job.habilidades_coincidentes.join(', ')}\\n`;\n  }\n  cuerpo += `🔗 [Ver vacante](${job.url})\\n\\n`;\n});\n\nreturn [{\n  json: {\n    mensaje: cuerpo\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2992,
+        80
+      ],
+      "id": "147fbdcf-0083-4096-a305-f1641589db1f",
+      "name": "Formatear_Reporte"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2c90cc78-9c14-475f-a380-5651ee4ba808",
+              "leftValue": "={{ $json.aplica }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2768,
+        128
+      ],
+      "id": "8e2bf5cb-7acc-42b5-8f25-f2dd0a964ecc",
+      "name": "Filtrar_Aprobados"
+    },
+    {
+      "parameters": {
+        "sendTo": "carloscaicedog2008cc.@gmail.com",
+        "subject": "🚀 Radar Laboral: Nuevas Oportunidades",
+        "emailType": "text",
+        "message": "={{ $json.mensaje }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3216,
+        80
+      ],
+      "id": "3a93e971-db0c-4a4f-b95f-9bb8986eeb5c",
+      "name": "Send a message",
+      "webhookId": "6ce579f9-07d7-4da7-862b-44b9b7da2564",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "oF95fY7Bv5qFHwS8",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://jobicy.com/api/v2/remote-jobs?count=50&industry=engineering",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        -80
+      ],
+      "id": "3d6b3211-aba6-4602-b1cf-eb2aac9f2bf1",
+      "name": "HTTP Jobicy"
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs?category=software-dev",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        -224
+      ],
+      "id": "25cddfa0-3101-4fe8-8834-be04955db1ca",
+      "name": "HTTP Remotive"
+    },
+    {
+      "parameters": {
+        "url": "https://www.themuse.com/api/public/jobs?category=Data%20and%20Analytics&category=Software%20Engineering&page=1",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        96
+      ],
+      "id": "848b96dd-259f-40c5-84c5-74ef42e45d00",
+      "name": "HTTP The Muse"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.jobs || [];\nreturn items.map(job => ({\n  json: {\n    id: `remotive_${job.id}`,\n    fuente: 'Remotive',\n    titulo: job.title || '',\n    empresa: job.company_name || 'Confidencial',\n    url: job.url || '',\n    ubicacion: job.candidate_required_location || 'Remoto',\n    descripcionLimpia: (job.description || '')\n      .replace(/<[^>]*>?/gm, ' ')\n      .replace(/\\s+/g, ' ')\n      .trim()\n      .slice(0, 3000)\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        -224
+      ],
+      "id": "818a3097-da79-4651-9f93-1c7b1eb7aa4c",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.jobs || [];\nreturn items.map(job => ({\n  json: {\n    id: `jobicy_${job.id}`,\n    fuente: 'Jobicy',\n    titulo: job.jobTitle || '',\n    empresa: job.companyName || 'Confidencial',\n    url: job.url || '',\n    ubicacion: job.jobGeo || 'Remoto',\n    descripcionLimpia: (job.jobDescription || '')\n      .replace(/<[^>]*>?/gm, ' ')\n      .replace(/\\s+/g, ' ')\n      .trim()\n      .slice(0, 3000)\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        -80
+      ],
+      "id": "5f5fe188-303d-48ec-a973-569a75e24a27",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.results || [];\nreturn items.map(job => ({\n  json: {\n    id: `themuse_${job.id}`,\n    fuente: 'The Muse',\n    titulo: job.name || '',\n    empresa: job.company?.name || 'Confidencial',\n    url: job.refs?.landing_page || '',\n    ubicacion: job.locations?.[0]?.name || 'Remoto',\n    descripcionLimpia: (job.contents || '')\n      .replace(/<[^>]*>?/gm, ' ')\n      .replace(/\\s+/g, ' ')\n      .trim()\n      .slice(0, 3000)\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        96
+      ],
+      "id": "3f2e29ca-288d-4094-af6f-9720c052a8b9",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1792,
+        -32
+      ],
+      "id": "363430eb-29c7-492a-b548-4359c090baf7",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "url": "https://www.getonbrd.com/api/v0/categories/programming/jobs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "per_page",
+              "value": "50"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        288
+      ],
+      "id": "d2390abb-212d-4330-b21f-051843b4c994",
+      "name": "HTTP Get on Board"
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.first().json.data || [];\nreturn jobs.map(item => {\n  const attr = item.attributes;\n  return {\n    json: {\n      id: item.id,\n      fuente: 'GetOnBoard',\n      titulo: attr.title,\n      empresa: attr.company?.data?.attributes?.name || 'Confidencial',\n      url: attr.links?.public_url || '',\n      ubicacion: `${attr.country || ''} - ${attr.city || ''} (${attr.modality || ''})`.trim(),\n      descripcionLimpia: (attr.description || '').replace(/<[^>]*>?/gm, ' ').replace(/\\s+/g, ' ').trim().slice(0, 3000)\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        288
+      ],
+      "id": "4bb65320-5a0b-46dc-88b8-6f97907e074d",
+      "name": "Code in JavaScript5"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Jobicy",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Remotive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP The Muse",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Get on Board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "Evaluar_Oferta_LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluar_Oferta_LLM": {
+      "main": [
+        [
+          {
+            "node": "Parsear_Evaluacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear_Evaluacion": {
+      "main": [
+        [
+          {
+            "node": "Aplanar_Gap_Skills",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filtrar_Aprobados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplanar_Gap_Skills": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar_Aprobados": {
+      "main": [
+        [
+          {
+            "node": "Formatear_Reporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear_Reporte": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Jobicy": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Remotive": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "HTTP The Muse": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "HTTP Get on Board": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fc3d734c-1ad1-459c-a652-b329ec5eee42",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "47a17af7f0d59c648449f75d91448e71bec4469c4a177b33e461ca4efa732582"
+  },
+  "nodeGroups": [],
+  "id": "0dP7MFbO7YVyYMe2",
+  "tags": []
+}
