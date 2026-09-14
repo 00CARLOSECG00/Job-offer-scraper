@@ -1,0 +1,280 @@
+{
+  "name": "Agrupar Gap Skills",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                3,
+                5,
+                6
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -432,
+        -96
+      ],
+      "id": "b4ae2a54-fa1b-449c-8ce2-54c51167ff5d",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs",
+          "mode": "list",
+          "cachedResultName": "job-offer-scraper",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 854508604,
+          "mode": "list",
+          "cachedResultName": "Gap_Skills",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit#gid=854508604"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -208,
+        -96
+      ],
+      "id": "2de984da-41c8-42b7-9ebb-87ab72fca61c",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2LswmUiVzFLVgT6K",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\n\nconst mapaHabilidades = {};\n\nfor (const fila of items) {\n  const nombre = (fila.Habilidad_Faltante || \"\").trim();\n  if (!nombre) continue;\n\n  const conteoFila = parseInt(fila.Conteo) || 1;\n  const fechaFila = new Date(fila.Ultima_Vez_Vista || Date.now());\n\n  // Si es la primera vez que vemos esta habilidad en el bucle, la registramos\n  if (!mapaHabilidades[nombre]) {\n    mapaHabilidades[nombre] = {\n      Habilidad_Faltante: nombre,\n      Conteo: 0,\n      Ultima_Vez_Vista: fechaFila\n    };\n  }\n\n  // Sumar el conteo\n  mapaHabilidades[nombre].Conteo += conteoFila;\n\n  // Conservar la fecha de la vez más reciente que apareció\n  if (fechaFila > mapaHabilidades[nombre].Ultima_Vez_Vista) {\n    mapaHabilidades[nombre].Ultima_Vez_Vista = fechaFila;\n  }\n}\n\n// Convertir el mapa de vuelta al formato que entiende n8n\nconst resultado = Object.values(mapaHabilidades).map(hab => {\n  const d = hab.Ultima_Vez_Vista;\n  const fechaStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;\n\n  return {\n    json: {\n      Habilidad_Faltante: hab.Habilidad_Faltante,\n      Conteo: hab.Conteo,\n      Ultima_Vez_Vista: fechaStr\n    }\n  };\n});\n\n// Ordenar las habilidades para que las más demandadas queden de primeras\nresultado.sort((a, b) => b.json.Conteo - a.json.Conteo);\n\nreturn resultado;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        -96
+      ],
+      "id": "24985de3-bf29-4c3c-be79-3c2f70b7cc79",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "value": "1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs",
+          "mode": "list",
+          "cachedResultName": "job-offer-scraper",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 854508604,
+          "mode": "list",
+          "cachedResultName": "Gap_Skills",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit#gid=854508604"
+        },
+        "numberToDelete": 1000
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        240,
+        -96
+      ],
+      "id": "ae707a76-4cef-4bb5-8089-2a72ebc1dd3f",
+      "name": "Delete rows or columns from sheet",
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2LswmUiVzFLVgT6K",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs",
+          "mode": "list",
+          "cachedResultName": "job-offer-scraper",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 854508604,
+          "mode": "list",
+          "cachedResultName": "Gap_Skills",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1rjX_AwLVqg19Fp7YM98dk0ZfaEIrPJjn2Cq2Aoh3XVs/edit#gid=854508604"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Habilidad_Faltante",
+              "displayName": "Habilidad_Faltante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Conteo",
+              "displayName": "Conteo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Ultima_Vez_Vista",
+              "displayName": "Ultima_Vez_Vista",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        688,
+        -96
+      ],
+      "id": "11796e72-66d8-4ae6-b1c5-d69efe1cfd86",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "2LswmUiVzFLVgT6K",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Este código \"viaja en el tiempo\" y rescata los datos del primer código\n// IMPORTANTE: Cambia 'Code' por el nombre exacto que tenga tu nodo \n// que hizo la agrupación (el que escribimos en el paso 3 de antes).\n// Si no le cambiaste el nombre, probablemente se llame 'Code' o 'Code1'.\n\nreturn $('Code in JavaScript').all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -96
+      ],
+      "id": "3e53f5a6-6789-481b-9cf2-52972cea4fd5",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Delete rows or columns from sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete rows or columns from sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "18ef7c24-adc4-497c-b885-33df2908f6b0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "47a17af7f0d59c648449f75d91448e71bec4469c4a177b33e461ca4efa732582"
+  },
+  "nodeGroups": [],
+  "id": "EhaDRfrKsPiQ5H32",
+  "tags": []
+}
