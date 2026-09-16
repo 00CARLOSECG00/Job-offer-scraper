@@ -384,7 +384,7 @@
       "typeVersion": 4.5,
       "position": [
         1344,
-        -80
+        -176
       ],
       "id": "3d6b3211-aba6-4602-b1cf-eb2aac9f2bf1",
       "name": "HTTP Jobicy"
@@ -398,7 +398,7 @@
       "typeVersion": 4.5,
       "position": [
         1344,
-        -224
+        -352
       ],
       "id": "25cddfa0-3101-4fe8-8834-be04955db1ca",
       "name": "HTTP Remotive"
@@ -412,7 +412,7 @@
       "typeVersion": 4.5,
       "position": [
         1344,
-        96
+        0
       ],
       "id": "848b96dd-259f-40c5-84c5-74ef42e45d00",
       "name": "HTTP The Muse"
@@ -425,7 +425,7 @@
       "typeVersion": 2,
       "position": [
         1568,
-        -224
+        -352
       ],
       "id": "818a3097-da79-4651-9f93-1c7b1eb7aa4c",
       "name": "Code in JavaScript2"
@@ -438,7 +438,7 @@
       "typeVersion": 2,
       "position": [
         1568,
-        -80
+        -176
       ],
       "id": "5f5fe188-303d-48ec-a973-569a75e24a27",
       "name": "Code in JavaScript3"
@@ -451,20 +451,20 @@
       "typeVersion": 2,
       "position": [
         1568,
-        96
+        0
       ],
       "id": "3f2e29ca-288d-4094-af6f-9720c052a8b9",
       "name": "Code in JavaScript4"
     },
     {
       "parameters": {
-        "numberInputs": 4
+        "numberInputs": 5
       },
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
         1792,
-        -32
+        -48
       ],
       "id": "363430eb-29c7-492a-b548-4359c090baf7",
       "name": "Merge"
@@ -477,7 +477,7 @@
           "parameters": [
             {
               "name": "per_page",
-              "value": "50"
+              "value": "60"
             }
           ]
         },
@@ -487,7 +487,7 @@
       "typeVersion": 4.5,
       "position": [
         1344,
-        288
+        176
       ],
       "id": "d2390abb-212d-4330-b21f-051843b4c994",
       "name": "HTTP Get on Board"
@@ -500,10 +500,47 @@
       "typeVersion": 2,
       "position": [
         1568,
-        288
+        176
       ],
       "id": "4bb65320-5a0b-46dc-88b8-6f97907e074d",
       "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst nuevosJobs = [];\n\nconst jobUrlRegex = /https:\\/\\/www\\.linkedin\\.com\\/(?:comm\\/)?jobs\\/view\\/\\d+[^\\s]*/i;\n\nconst lineasIgnoradas = new Set([\n  'Solicitar con perfil y CV',\n  'Solicitud sencilla'\n]);\n\nfor (const item of items) {\n  const texto = String(\n    item.json.textPlain || item.json.snippet || ''\n  ).replace(/\\r/g, '');\n\n  const msgId = item.json.id || Date.now();\n  const lineas = texto\n    .split('\\n')\n    .map(linea => linea.trim())\n    .filter(Boolean);\n\n  for (let i = 0; i < lineas.length; i++) {\n    const coincidencia = lineas[i].match(jobUrlRegex);\n\n    if (!coincidencia) {\n      continue;\n    }\n\n    const url = coincidencia[0];\n\n    const contexto = lineas\n      .slice(Math.max(0, i - 6), i)\n      .filter(linea =>\n        !linea.startsWith('Ver anuncio de empleo') &&\n        !lineasIgnoradas.has(linea) &&\n        !/^[-]+$/.test(linea)\n      );\n\n    if (contexto.length < 3) {\n      continue;\n    }\n\n    let ubicacion = contexto[contexto.length - 1];\n    const empresa = contexto[contexto.length - 2];\n    const titulo = contexto[contexto.length - 3];\n\n    // Verifica si la modalidad remota se mencionó en las líneas cercanas\n    const textoContexto = contexto.join(' ').toLowerCase();\n    if ((textoContexto.includes('remoto') || textoContexto.includes('remote')) && !ubicacion.toLowerCase().includes('remot')) {\n        ubicacion += ' (Remoto)';\n    }\n\n    nuevosJobs.push({\n      json: {\n        id: `linkedin_${msgId}_${i}`,\n        fuente: 'LinkedIn Email',\n        titulo,\n        empresa,\n        url,\n        ubicacion,\n        descripcionLimpia: contexto.join(' ')\n      }\n    });\n  }\n}\n\nreturn nuevosJobs;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        352
+      ],
+      "id": "e233c126-0ed6-4f44-b2af-eb6ffd6a2317",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": 20,
+        "filters": {
+          "q": "from:jobs-noreply@linkedin.com newer_than:1d"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        352
+      ],
+      "id": "f4cdbfdd-e2c6-4584-86d2-571b1d265bae",
+      "name": "Gmail LinkedIn",
+      "webhookId": "9d4a2c2b-94de-462e-ab46-8abfece7585c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "oF95fY7Bv5qFHwS8",
+          "name": "Gmail account"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -769,14 +806,40 @@
           }
         ]
       ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Gmail LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1,
+    "availableInMCP": false
   },
-  "versionId": "0e18cdec-e874-47a8-8606-3b978793ccf2",
+  "versionId": "dd5ab2fe-6cfe-43e5-8ce8-534deb8c8079",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "47a17af7f0d59c648449f75d91448e71bec4469c4a177b33e461ca4efa732582"

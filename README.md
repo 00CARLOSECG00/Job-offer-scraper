@@ -1,6 +1,6 @@
 # Job Offer Scraper
 
-Automatización en **n8n** que descubre vacantes de nivel junior/entry-level, las filtra según un perfil profesional y unas preferencias guardadas en Google Sheets, evalúa cada oferta con un modelo de lenguaje (Groq) y envía un reporte por Gmail con las vacantes recomendadas.
+Automatización en **n8n** que descubre vacantes (desde APIs públicas y alertas de LinkedIn), las filtra según un perfil profesional y unas preferencias guardadas en Google Sheets, evalúa cada oferta con un modelo de lenguaje (Groq) y envía un reporte por Gmail con las vacantes recomendadas.
 
 ## Tabla de contenidos
 
@@ -20,15 +20,16 @@ El workflow se ejecuta automáticamente **lunes, miércoles, viernes y sábados 
 
 1. Lee el perfil técnico (`Mi_Perfil`) y los filtros de búsqueda (`Filtros_Busqueda`) desde Google Sheets.
 2. Construye, en un único nodo de código, las listas de roles deseados/rechazados, keywords rechazadas, ubicaciones válidas/rechazadas y un texto de perfil (ej. `Ingeniero de Sistemas. Habilidades técnicas: Python (Avanzado), SQL (Intermedio)...`).
-3. Consulta en paralelo cuatro fuentes públicas de vacantes:
-   - **Remotive** — categoría `software-dev`.
-   - **Jobicy** — industria `engineering` (hasta 50 resultados).
-   - **The Muse** — categorías `Data and Analytics` y `Software Engineering`.
-   - **Get on Board** — categoría `programming` (hasta 50 resultados por página).
+3. Consulta en paralelo **cinco** fuentes de vacantes:
+   - **Remotive** (API) — categoría `software-dev`.
+   - **Jobicy** (API) — industria `engineering` (hasta 50 resultados).
+   - **The Muse** (API) — categorías `Data and Analytics` y `Software Engineering`.
+   - **Get on Board** (API) — categoría `programming` (hasta 50 resultados por página).
+   - **LinkedIn (Gmail)** — lee los correos recientes de alertas de empleo enviados por `jobs-noreply@linkedin.com`.
 
-   > Ninguna de las cuatro APIs se consulta con un término tipo `junior` en la query; el filtrado por nivel/rol ocurre después, comparando el título de cada oferta contra `Roles_Deseados`.
-4. Normaliza la respuesta de cada fuente a un esquema común (`id`, `fuente`, `titulo`, `empresa`, `url`, `ubicacion`, `descripcionLimpia`).
-5. Une las cuatro fuentes con un nodo `Merge` (4 entradas) y aplica los filtros de texto:
+   
+4. Normaliza la respuesta de cada API a un esquema común (`id`, `fuente`, `titulo`, `empresa`, `url`, `ubicacion`, `descripcionLimpia`). Para el caso de **LinkedIn**, un nodo de código parsea el texto plano del correo usando expresiones regulares (Regex) para identificar los enlaces de las vacantes, y luego lee las líneas anteriores (hacia atrás) para extraer el título, la empresa y la ubicación, ignorando el ruido o texto de botones.
+5. Une las **cinco** fuentes con un nodo `Merge` (5 entradas) y aplica los filtros de texto:
    - Descarta ubicaciones rechazadas y, si hay una lista de ubicaciones válidas, exige que la oferta coincida con alguna.
    - Descarta títulos con roles rechazados (ej. *senior*, *lead*).
    - Descarta ofertas cuyo título o descripción contenga alguna keyword rechazada.
@@ -45,7 +46,7 @@ Si la lista `Roles_Deseados` llega vacía desde Sheets, el flujo corta la ejecuc
 
 ![Diagrama de arquitectura del workflow](flujo.png)
 
-El flujo comienza leyendo el perfil y los filtros en Google Sheets, construye las listas de filtrado y el texto de perfil, y dispara en paralelo las cuatro consultas a las APIs de empleo. Cada respuesta se normaliza al mismo esquema, se combina con `Merge`, se filtra por texto y se limita a 40 ofertas antes de pasar por Groq. Finalmente, registra las brechas de habilidades detectadas y envía por Gmail las ofertas aprobadas.
+El flujo comienza leyendo el perfil y los filtros en Google Sheets, construye las listas de filtrado y el texto de perfil. Luego, dispara en paralelo las cuatro consultas a las APIs de empleo y la lectura de correos de LinkedIn vía Gmail. Cada resultado se normaliza al mismo esquema, se combina con `Merge`, se filtra por texto y se limita a 40 ofertas antes de pasar por Groq. Finalmente, registra las brechas de habilidades detectadas y envía por Gmail las ofertas aprobadas.
 
 ### Nodos principales
 
@@ -55,9 +56,10 @@ El flujo comienza leyendo el perfil y los filtros en Google Sheets, construye la
 | `Get row(s) in sheet` / `Aggregate` | Lee y agrupa la hoja `Mi_Perfil`. |
 | `Get row(s) in sheet1` / `Aggregate1` | Lee y agrupa la hoja `Filtros_Busqueda`. |
 | `Code in JavaScript` | Construye las listas de roles/keywords/ubicaciones y el texto del perfil (`perfilString`). Corta el flujo con una alerta si `Roles_Deseados` viene vacío. |
-| `HTTP Remotive`, `HTTP Jobicy`, `HTTP The Muse`, `HTTP Get on Board` | Obtienen vacantes desde las cuatro APIs externas, en paralelo. |
-| `Code in JavaScript2` (Remotive), `Code in JavaScript3` (Jobicy), `Code in JavaScript4` (The Muse), `Code in JavaScript5` (Get on Board) | Normalizan cada fuente al mismo esquema de campos. |
-| `Merge` | Une las cuatro fuentes normalizadas (4 entradas). |
+| `HTTP Remotive`, `HTTP Jobicy`, `HTTP The Muse`, `HTTP Get on Board` | Obtienen vacantes desde las cuatro APIs externas. |
+| `Gmail` | Obtiene los correos recientes de `jobs-noreply@linkedin.com` usando el filtro de búsqueda nativo. |
+| `Code in JavaScript2,3,4,5` (APIs) y `Code` (Parseador LinkedIn) | Normalizan cada fuente al mismo esquema. El parseador de LinkedIn usa Regex y contexto de líneas para extraer vacantes limpias del texto del correo. |
+| `Merge` | Une las **cinco** fuentes normalizadas (5 entradas). |
 | `Code in JavaScript1` | Aplica los filtros de ubicación, rol rechazado, keyword rechazada y rol deseado; arma el objeto final de cada oferta aprobada. |
 | `Limit` | Reduce el lote a 40 ofertas como máximo. |
 | `Evaluar_Oferta_LLM` | Envía cada oferta a Groq (lote de 1, cada 10 s) y solicita un JSON con score, aplicabilidad, resumen y brechas. |
@@ -144,8 +146,6 @@ Además del workflow principal, el repositorio incluye un segundo workflow de n8
 | `Delete rows or columns from sheet` | Borra hasta 1000 filas de `Gap_Skills` (`executeOnce`, continúa aunque falle). |
 | `Code in JavaScript1` | Recupera el resultado ya agrupado del primer nodo de código para reinsertarlo. |
 | `Append row in sheet` | Reescribe `Gap_Skills` con una fila consolidada por habilidad. |
-
-
 
 ## Limitaciones conocidas
 
